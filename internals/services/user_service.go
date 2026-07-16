@@ -2,21 +2,29 @@ package services
 
 import (
 	"context"
+	"encoding/json"
 	"errors"
+	"fmt"
+	"github.com/faramarzQ/sms-gateway-service/internals/dtos"
 	httpErrors "github.com/faramarzQ/sms-gateway-service/internals/http/errors"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/requests"
 	"github.com/faramarzQ/sms-gateway-service/internals/models"
 	"github.com/faramarzQ/sms-gateway-service/internals/repositories"
+	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
+	"github.com/redis/go-redis/v9"
 	"gorm.io/gorm"
+	"time"
 )
 
 type UserService struct {
-	repo *repositories.UserRepository
+	repo  *repositories.UserRepository
+	redis *redis.Client
 }
 
-func NewUserService(userRepo *repositories.UserRepository) *UserService {
+func NewUserService(userRepo *repositories.UserRepository, redis *redis.Client) *UserService {
 	return &UserService{
-		repo: userRepo,
+		repo:  userRepo,
+		redis: redis,
 	}
 }
 
@@ -54,4 +62,50 @@ func (s *UserService) IncreaseBalance(ctx context.Context, userId uint64, req re
 	}
 
 	return nil
+}
+
+func (s *UserService) GetUserTrafficClass(ctx context.Context, userId uint64) (*value_objects.TrafficClass, error) {
+	key := fmt.Sprintf("user:%d:traffic_class", userId)
+
+	cachedUser, err := s.redis.Get(ctx, key).Bytes()
+	if err != nil && err != redis.Nil {
+		return nil, err
+	}
+
+	if err != redis.Nil {
+		var trafficClass dtos.UserTrafficClass
+		if err := json.Unmarshal(cachedUser, &trafficClass); err != nil {
+			return nil, fmt.Errorf("unmarshal traffic class: %w", err)
+		}
+
+		return &trafficClass.Class, nil
+	}
+
+	// cache miss:
+
+	trafficClass, err := s.repo.GetUserTrafficClass(ctx, userId)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, httpErrors.ErrUserNotFound
+		}
+		return nil, err
+	}
+
+	trafficClassDto := dtos.UserTrafficClass{
+		Class: *trafficClass,
+	}
+
+	data, err := json.Marshal(trafficClassDto)
+	if err != nil {
+		return nil, err
+	}
+
+	err = s.redis.Set(
+		ctx,
+		key,
+		data,
+		24*time.Hour,
+	).Err()
+
+	return trafficClass, nil
 }

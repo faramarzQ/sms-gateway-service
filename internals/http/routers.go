@@ -5,7 +5,10 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func RegisterRoutes(ginRouter *gin.Engine, userHandler *handlers.UserHandler) {
+func RegisterRoutes(ginRouter *gin.Engine,
+	userHandler *handlers.UserHandler,
+	smsHandler *handlers.SMSHandler,
+) {
 
 	users := ginRouter.Group("/user")
 	{
@@ -13,4 +16,10 @@ func RegisterRoutes(ginRouter *gin.Engine, userHandler *handlers.UserHandler) {
 		users.PUT("/:id/balance", userHandler.IncreaseBalance)
 	}
 
+	sms := ginRouter.Group("/sms")
+	{
+		sms.POST("/", smsHandler.SendSMS)
+		sms.POST("/batch", smsHandler.SendSMSBatch)
+		sms.GET("/report", smsHandler.GetReport)
+	}
 }

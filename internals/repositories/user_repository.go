@@ -4,6 +4,7 @@ import (
 	"context"
 	"fmt"
 	"github.com/faramarzQ/sms-gateway-service/internals/models"
+	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
 	"gorm.io/gorm"
 )
 
@@ -47,4 +48,20 @@ func (r *UserRepository) IncreaseBalance(ctx context.Context, id uint64, amount 
 		Where("id = ?", id).
 		Update("balance", gorm.Expr("balance + ?", amount)).
 		Error
+}
+
+func (r *UserRepository) GetUserTrafficClass(ctx context.Context, userId uint64) (*value_objects.TrafficClass, error) {
+	var trafficClass value_objects.TrafficClass
+
+	err := r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Select("traffic_class").
+		Where("id = ?", userId).
+		Scan(&trafficClass).Error
+
+	if err != nil {
+		return nil, fmt.Errorf("get user traffic class: %w", err)
+	}
+
+	return &trafficClass, nil
 }
