@@ -29,3 +29,22 @@ func (r *UserRepository) GetUserById(ctx context.Context, id uint64) (*models.Us
 
 	return &user, nil
 }
+
+func (r *UserRepository) ExistsById(ctx context.Context, id uint64) (bool, error) {
+	var exists bool
+
+	err := r.db.WithContext(ctx).
+		Raw("SELECT EXISTS(SELECT 1 FROM users WHERE id = ?)", id).
+		Scan(&exists).
+		Error
+
+	return exists, err
+}
+
+func (r *UserRepository) IncreaseBalance(ctx context.Context, id uint64, amount int64) error {
+	return r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", id).
+		Update("balance", gorm.Expr("balance + ?", amount)).
+		Error
+}

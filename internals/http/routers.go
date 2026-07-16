@@ -10,7 +10,7 @@ func RegisterRoutes(ginRouter *gin.Engine, userHandler *handlers.UserHandler) {
 	users := ginRouter.Group("/user")
 	{
 		users.GET("/:id", userHandler.GetUser)
-		// update balance
+		users.PUT("/:id/balance", userHandler.IncreaseBalance)
 	}
 
 }
