@@ -6,7 +6,6 @@ import (
 	"github.com/faramarzQ/sms-gateway-service/internals/database"
 	"github.com/faramarzQ/sms-gateway-service/internals/logger"
 	"github.com/faramarzQ/sms-gateway-service/internals/message_broker"
-	"github.com/gin-gonic/gin"
 	"log"
 )
 
@@ -22,9 +21,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	router := gin.Default()
-
-	application := app.NewApp(app.AppAPI, db, rabbitmq, redis, router)
+	application := app.NewApp(app.AppTrafficClassifier, db, rabbitmq, redis, nil)
 	err = application.Build()
 	if err != nil {
 		log.Fatal("Error building application")
@@ -34,5 +31,4 @@ func main() {
 	if err != nil {
 		log.Fatal("Error running application")
 	}
-
 }

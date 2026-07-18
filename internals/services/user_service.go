@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/faramarzQ/sms-gateway-service/internals/cache"
 	"github.com/faramarzQ/sms-gateway-service/internals/dtos"
 	httpErrors "github.com/faramarzQ/sms-gateway-service/internals/http/errors"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/requests"
@@ -65,7 +66,7 @@ func (s *UserService) IncreaseBalance(ctx context.Context, userId uint64, req re
 }
 
 func (s *UserService) GetUserTrafficClass(ctx context.Context, userId uint64) (*value_objects.TrafficClass, error) {
-	key := fmt.Sprintf("user:%d:traffic_class", userId)
+	key := fmt.Sprintf(cache.UserTrafficClass, userId)
 
 	cachedUser, err := s.redis.Get(ctx, key).Bytes()
 	if err != nil && err != redis.Nil {

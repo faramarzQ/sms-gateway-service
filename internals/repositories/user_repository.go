@@ -3,9 +3,12 @@ package repositories
 import (
 	"context"
 	"fmt"
+	dtos "github.com/faramarzQ/sms-gateway-service/internals/dtos"
 	"github.com/faramarzQ/sms-gateway-service/internals/models"
+	repoDtos "github.com/faramarzQ/sms-gateway-service/internals/repositories/dtos"
 	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
 	"gorm.io/gorm"
+	"strings"
 )
 
 type UserRepository struct {
@@ -64,4 +67,61 @@ func (r *UserRepository) GetUserTrafficClass(ctx context.Context, userId uint64)
 	}
 
 	return &trafficClass, nil
+}
+
+func (r *UserRepository) GetAllUsersTrafficInfo(
+	ctx context.Context,
+) ([]repoDtos.UserTrafficInfo, error) {
+	var users []repoDtos.UserTrafficInfo
+
+	err := r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Select("id", "traffic_class").
+		Scan(&users).Error
+	if err != nil {
+		return nil, err
+	}
+
+	return users, nil
+}
+
+func (r *UserRepository) UpdateTrafficClass(
+	ctx context.Context,
+	userID uint64,
+	class value_objects.TrafficClass,
+) error {
+	return r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ?", userID).
+		Update("traffic_class", class).Error
+}
+
+func (r *UserRepository) BulkUpdateTrafficClass(
+	ctx context.Context,
+	changes []dtos.TrafficClassChange,
+) error {
+	if len(changes) == 0 {
+		return nil
+	}
+
+	var (
+		caseSQL strings.Builder
+		ids     []uint64
+		args    []interface{}
+	)
+
+	caseSQL.WriteString("UPDATE users SET traffic_class = CASE id ")
+
+	for _, change := range changes {
+		caseSQL.WriteString("WHEN ? THEN ? ")
+		args = append(args, change.UserID, change.Class)
+		ids = append(ids, change.UserID)
+	}
+
+	caseSQL.WriteString("END WHERE id IN ?")
+
+	args = append(args, ids)
+
+	return r.db.WithContext(ctx).
+		Exec(caseSQL.String(), args...).Error
 }

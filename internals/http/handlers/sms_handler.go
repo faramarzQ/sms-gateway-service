@@ -31,29 +31,19 @@ func (h *SMSHandler) SendSMS(c *gin.Context) {
 		return
 	}
 
-	err := h.smsService.SendSMS(c, req)
+	responseError, err := h.smsService.SendSMS(c, req)
 
 	if err != nil {
-		switch {
-		case errors.Is(err, httpErrors.ErrUserNotFound):
-			c.JSON(http.StatusNotFound, responses.Response{
-				Status:  http.StatusNotFound,
-				Message: err.Error(),
-			})
-
-		default:
-			c.JSON(http.StatusInternalServerError, responses.Response{
-				Status:  http.StatusInternalServerError,
-				Message: "internal server error",
-			})
-		}
-
-		return
+		c.JSON(http.StatusInternalServerError, responses.Response{
+			Status:  http.StatusInternalServerError,
+			Message: "internal server error",
+		})
 	}
 
 	c.JSON(http.StatusOK, responses.Response{
 		Status:  http.StatusOK,
 		Message: "ok",
+		Data:    responseError,
 	})
 }
 
@@ -67,12 +57,18 @@ func (h *SMSHandler) SendSMSBatch(c *gin.Context) {
 		return
 	}
 
-	err := h.smsService.SendSMSBatch(c, req)
+	responseError, err := h.smsService.SendSMSBatch(c, req)
+	if err != nil {
+		c.JSON(http.StatusInternalServerError, responses.Response{
+			Status:  http.StatusInternalServerError,
+			Message: "internal server error",
+		})
+	}
 
 	c.JSON(http.StatusOK, responses.Response{
 		Status:  http.StatusOK,
 		Message: "ok",
-		Data:    err,
+		Data:    responseError,
 	})
 }
 

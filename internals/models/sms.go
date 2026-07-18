@@ -14,6 +14,8 @@ const SMSStatusDelivered SMSStatus = "delivered"
 type SMS struct {
 	ID uint64 `gorm:"primaryKey"`
 
+	ClientID string `gorm:"size:100;not null;index"`
+
 	UserID uint64 `gorm:"index;not null"`
 
 	PhoneNumber string `gorm:"size:20;not null"`
