@@ -19,6 +19,17 @@ func NewUserHandler(userService *services.UserService) *UserHandler {
 	return &UserHandler{userService: userService}
 }
 
+// GetUser godoc
+// @Summary      Get user by ID
+// @Description  Returns user details including balance and traffic class
+// @Tags         user
+// @Produce      json
+// @Param        id   path      int  true  "User ID"
+// @Success      200  {object}  responses.UserDataResponse
+// @Failure      400  {object}  map[string]string
+// @Failure      404  {object}  responses.ErrorResponse
+// @Failure      500  {object}  responses.ErrorResponse
+// @Router       /user/{id} [get]
 func (h *UserHandler) GetUser(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)
@@ -55,6 +66,19 @@ func (h *UserHandler) GetUser(c *gin.Context) {
 	})
 }
 
+// IncreaseBalance godoc
+// @Summary      Increase user balance
+// @Description  Adds credits to a user's SMS balance
+// @Tags         user
+// @Accept       json
+// @Produce      json
+// @Param        id    path      int                              true  "User ID"
+// @Param        body  body      requests.IncreaseBalanceRequest  true  "Amount to add"
+// @Success      200   {object}  responses.EmptyDataResponse
+// @Failure      400   {object}  responses.ErrorResponse
+// @Failure      404   {object}  responses.ErrorResponse
+// @Failure      500   {object}  responses.ErrorResponse
+// @Router       /user/{id}/balance [put]
 func (h *UserHandler) IncreaseBalance(c *gin.Context) {
 	idStr := c.Param("id")
 	id, err := strconv.ParseUint(idStr, 10, 64)

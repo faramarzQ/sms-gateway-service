@@ -1,13 +1,9 @@
-// @title           SMS Gateway Service API
-// @version         1.0
-// @description     REST API for sending SMS, managing user balance, and
 package main
 
 import (
+	_ "github.com/faramarzQ/sms-gateway-service/docs"
 	"github.com/faramarzQ/sms-gateway-service/internals/app"
 	"github.com/faramarzQ/sms-gateway-service/internals/cache"
-eway-service/docs"
-	"github.com/faramarzQ/sms-gateway-servic
 	"github.com/faramarzQ/sms-gateway-service/internals/config"
 	"github.com/faramarzQ/sms-gateway-service/internals/database"
 	"github.com/faramarzQ/sms-gateway-service/internals/logger"

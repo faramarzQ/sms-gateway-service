@@ -1,0 +1,365 @@
+definitions:
+  models.User:
+    properties:
+      balance:
+        type: integer
+      created_at:
+        type: string
+      id:
+        type: integer
+      name:
+        type: string
+      traffic_class:
+        $ref: '#/definitions/value_objects.TrafficClass'
+      updated_at:
+        type: string
+    type: object
+  requests.IncreaseBalanceRequest:
+    properties:
+      amount:
+        type: integer
+    required:
+    - amount
+    type: object
+  requests.SMSRequest:
+    properties:
+      client_id:
+        type: string
+      message:
+        maxLength: 160
+        type: string
+      phone_number:
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/value_objects.SMSType'
+        enum:
+        - ordinary
+        - express
+    required:
+    - client_id
+    - message
+    - phone_number
+    - type
+    type: object
+  requests.SendSMSBatchRequest:
+    properties:
+      messages:
+        items:
+          $ref: '#/definitions/requests.SMSRequest'
+        minItems: 1
+        type: array
+      user_id:
+        type: integer
+    required:
+    - messages
+    - user_id
+    type: object
+  requests.SendSMSRequest:
+    properties:
+      client_id:
+        type: string
+      message:
+        maxLength: 160
+        type: string
+      phone_number:
+        type: string
+      type:
+        allOf:
+        - $ref: '#/definitions/value_objects.SMSType'
+        enum:
+        - ordinary
+        - express
+      user_id:
+        type: integer
+    required:
+    - client_id
+    - message
+    - phone_number
+    - type
+    - user_id
+    type: object
+  responses.EmptyDataResponse:
+    properties:
+      message:
+        example: ok
+        type: string
+      status:
+        example: 200
+        type: integer
+    type: object
+  responses.ErrorResponse:
+    properties:
+      message:
+        example: internal server error
+        type: string
+      status:
+        example: 500
+        type: integer
+    type: object
+  responses.SMSReportDataResponse:
+    properties:
+      data:
+        $ref: '#/definitions/responses.UserSMSReportResponse'
+      message:
+        example: ok
+        type: string
+      status:
+        example: 200
+        type: integer
+    type: object
+  responses.SMSReportResponse:
+    properties:
+      created_at:
+        type: string
+      id:
+        type: integer
+      message:
+        type: string
+      phone_number:
+        type: string
+      status:
+        type: string
+      type:
+        $ref: '#/definitions/value_objects.SMSType'
+    type: object
+  responses.SendSMSError:
+    properties:
+      client_id:
+        type: string
+      message:
+        type: string
+    type: object
+  responses.SendSMSErrorDataResponse:
+    properties:
+      data:
+        $ref: '#/definitions/responses.SendSMSErrorResponse'
+      message:
+        example: ok
+        type: string
+      status:
+        example: 200
+        type: integer
+    type: object
+  responses.SendSMSErrorResponse:
+    properties:
+      errors:
+        items:
+          $ref: '#/definitions/responses.SendSMSError'
+        type: array
+    type: object
+  responses.UserDataResponse:
+    properties:
+      data:
+        $ref: '#/definitions/models.User'
+      message:
+        example: ok
+        type: string
+      status:
+        example: 200
+        type: integer
+    type: object
+  responses.UserSMSReportResponse:
+    properties:
+      sms:
+        items:
+          $ref: '#/definitions/responses.SMSReportResponse'
+        type: array
+      total:
+        type: integer
+      user_id:
+        type: integer
+    type: object
+  value_objects.SMSType:
+    enum:
+    - express
+    - ordinary
+    type: string
+    x-enum-varnames:
+    - SMSTypeExpress
+    - SMSTypeOrdinary
+  value_objects.TrafficClass:
+    enum:
+    - standard
+    - bulk
+    type: string
+    x-enum-varnames:
+    - TrafficClassStandard
+    - TrafficClassBulk
+info:
+  contact: {}
+paths:
+  /sms/:
+    post:
+      consumes:
+      - application/json
+      description: Queues one SMS message for delivery
+      parameters:
+      - description: SMS payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requests.SendSMSRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.SendSMSErrorDataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/responses.SendSMSErrorDataResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Send a single SMS
+      tags:
+      - sms
+  /sms/batch:
+    post:
+      consumes:
+      - application/json
+      description: Queues multiple SMS messages for delivery concurrently
+      parameters:
+      - description: Batch SMS payload
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requests.SendSMSBatchRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.SendSMSErrorDataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "402":
+          description: Payment Required
+          schema:
+            $ref: '#/definitions/responses.SendSMSErrorDataResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Send SMS in batch
+      tags:
+      - sms
+  /sms/report:
+    get:
+      description: Returns all SMS records for the given user
+      parameters:
+      - description: User ID
+        in: query
+        name: user_id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.SMSReportDataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get SMS report for user
+      tags:
+      - sms
+  /user/{id}:
+    get:
+      description: Returns user details including balance and traffic class
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.UserDataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            additionalProperties:
+              type: string
+            type: object
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Get user by ID
+      tags:
+      - user
+  /user/{id}/balance:
+    put:
+      consumes:
+      - application/json
+      description: Adds credits to a user's SMS balance
+      parameters:
+      - description: User ID
+        in: path
+        name: id
+        required: true
+        type: integer
+      - description: Amount to add
+        in: body
+        name: body
+        required: true
+        schema:
+          $ref: '#/definitions/requests.IncreaseBalanceRequest'
+      produces:
+      - application/json
+      responses:
+        "200":
+          description: OK
+          schema:
+            $ref: '#/definitions/responses.EmptyDataResponse'
+        "400":
+          description: Bad Request
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "404":
+          description: Not Found
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+        "500":
+          description: Internal Server Error
+          schema:
+            $ref: '#/definitions/responses.ErrorResponse'
+      summary: Increase user balance
+      tags:
+      - user
+swagger: "2.0"
