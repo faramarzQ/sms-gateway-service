@@ -8,25 +8,37 @@ import (
 )
 
 const (
-	ExchangeSMS = "sms.dispatch"
+	ExchangeSMSDispatch = "sms.dispatch"
+	ExchangeSMSAck      = "sms.ack"
 
 	QueueStandardOrdinary = "sms.standard.ordinary"
 	QueueStandardExpress  = "sms.standard.express"
 	QueueBulkOrdinary     = "sms.bulk.ordinary"
 	QueueBulkExpress      = "sms.bulk.express"
+
+	QueueSMSAck = "sms.ack"
 )
 
 func Setup(ch *amqp.Channel) error {
-	if err := declareExchange(ch); err != nil {
+	if err := declareSMSDispatchExchange(ch); err != nil {
 		return err
 	}
 
-	return declareQueues(ch)
+	if err := declareSMSAckExchange(ch); err != nil {
+		return err
+	}
+
+	if err := declareDispatchQueues(ch); err != nil {
+		return err
+	}
+
+	return declareAckQueue(ch)
+
 }
 
-func declareExchange(ch *amqp.Channel) error {
+func declareSMSDispatchExchange(ch *amqp.Channel) error {
 	return ch.ExchangeDeclare(
-		ExchangeSMS,
+		ExchangeSMSDispatch,
 		"direct",
 		true,  // durable
 		false, // auto delete
@@ -36,7 +48,19 @@ func declareExchange(ch *amqp.Channel) error {
 	)
 }
 
-func declareQueues(ch *amqp.Channel) error {
+func declareSMSAckExchange(ch *amqp.Channel) error {
+	return ch.ExchangeDeclare(
+		ExchangeSMSAck,
+		"direct",
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+}
+
+func declareDispatchQueues(ch *amqp.Channel) error {
 	queues := []struct {
 		Name       string
 		RoutingKey string
@@ -81,7 +105,7 @@ func declareQueues(ch *amqp.Channel) error {
 		err = ch.QueueBind(
 			q.Name,
 			q.RoutingKey,
-			ExchangeSMS,
+			ExchangeSMSDispatch,
 			false,
 			nil,
 		)
@@ -91,4 +115,26 @@ func declareQueues(ch *amqp.Channel) error {
 	}
 
 	return nil
+}
+
+func declareAckQueue(ch *amqp.Channel) error {
+	_, err := ch.QueueDeclare(
+		QueueSMSAck,
+		true,
+		false,
+		false,
+		false,
+		nil,
+	)
+	if err != nil {
+		return err
+	}
+
+	return ch.QueueBind(
+		QueueSMSAck,
+		"sms.ack",
+		ExchangeSMSAck,
+		false,
+		nil,
+	)
 }

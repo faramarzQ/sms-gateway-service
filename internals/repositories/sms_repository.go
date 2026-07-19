@@ -41,7 +41,7 @@ func (r *SMSRepository) UpdateStatus(
 	status models.SMSStatus,
 ) error {
 
-	return r.db.WithContext(ctx).
+	return r.db.
 		Model(&models.SMS{}).
 		Where("id = ?", id).
 		Update("status", status).

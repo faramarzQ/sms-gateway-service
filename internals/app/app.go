@@ -14,11 +14,13 @@ import (
 const (
 	AppAPI               string = "API"
 	AppTrafficClassifier string = "Traffic Classifier"
+	AppMessageConsumer   string = "Message Consumer"
 )
 
 var RegisteredApplications = map[string]ApplicationFactory{
 	AppAPI:               NewAPI,
 	AppTrafficClassifier: NewTrafficClassifier,
+	AppMessageConsumer:   NewMessageConsumer,
 }
 
 type App struct {
@@ -31,12 +33,16 @@ type App struct {
 	Router   *gin.Engine
 	Redis    *redis.Client
 
+	MessagePublisher *message_broker.Publisher
+	MessageConsumer  *message_broker.Consumer
+
 	UserRepository *repositories.UserRepository
 	SMSRepository  *repositories.SMSRepository
 
 	UserService              *services.UserService
 	SMSService               *services.SMSService
 	TrafficClassifierService *services.TrafficClassifierService
+	MessageConsumerService   *services.MessageConsumerService
 
 	UserHandler *handlers.UserHandler
 	SMSHandler  *handlers.SMSHandler
@@ -69,7 +75,8 @@ func (app *App) Build() error {
 }
 
 func (app *App) BuildDependencies() error {
-	messagePublisher, err := message_broker.NewPublisher(app.rabbitMQ)
+	var err error
+	app.MessagePublisher, err = message_broker.NewPublisher(app.rabbitMQ)
 	if err != nil {
 		return err
 	}
@@ -78,7 +85,7 @@ func (app *App) BuildDependencies() error {
 	app.SMSRepository = repositories.NewSMSRepository(app.db)
 
 	app.UserService = services.NewUserService(app.UserRepository, app.Redis)
-	app.SMSService = services.NewSMSService(app.SMSRepository, messagePublisher, app.UserService, app.Redis)
+	app.SMSService = services.NewSMSService(app.SMSRepository, app.MessagePublisher, app.UserService, app.Redis)
 
 	return nil
 }
