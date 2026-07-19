@@ -1,6 +1,8 @@
 package database
 
 import (
+	"fmt"
+	"github.com/faramarzQ/sms-gateway-service/internals/config"
 	"gorm.io/gorm/logger"
 	"log"
 
@@ -8,8 +10,16 @@ import (
 	"gorm.io/gorm"
 )
 
-func ConnectPostgres() *gorm.DB {
-	dsn := "host=localhost user=postgres password=postgres dbname=sms_gateway port=5432 sslmode=disable"
+func ConnectPostgres(cfg config.PostgresConfig) *gorm.DB {
+	dsn := fmt.Sprintf(
+		"host=%s user=%s password=%s dbname=%s port=%s sslmode=%s",
+		cfg.Host,
+		cfg.User,
+		cfg.Password,
+		cfg.DBName,
+		cfg.Port,
+		cfg.SSLMode,
+	)
 
 	db, err := gorm.Open(postgres.Open(dsn), &gorm.Config{
 		Logger: logger.Default.LogMode(logger.Info),

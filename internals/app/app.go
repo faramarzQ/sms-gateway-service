@@ -85,7 +85,7 @@ func (app *App) BuildDependencies() error {
 	app.SMSRepository = repositories.NewSMSRepository(app.db)
 
 	app.UserService = services.NewUserService(app.UserRepository, app.Redis)
-	app.SMSService = services.NewSMSService(app.SMSRepository, app.MessagePublisher, app.UserService, app.Redis)
+	app.SMSService = services.NewSMSService(app.SMSRepository, app.MessagePublisher, app.UserService, app.UserRepository, app.Redis)
 
 	return nil
 }

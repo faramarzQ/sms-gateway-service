@@ -2,13 +2,14 @@ package cache
 
 import (
 	"context"
+	"github.com/faramarzQ/sms-gateway-service/internals/config"
 
 	"github.com/redis/go-redis/v9"
 )
 
-func ConnectRedis() *redis.Client {
+func ConnectRedis(cfg config.RedisConfig) *redis.Client {
 	client := redis.NewClient(&redis.Options{
-		Addr:     "localhost:6379",
+		Addr:     cfg.Host + ":" + cfg.Port,
 		Password: "",
 		DB:       0,
 	})

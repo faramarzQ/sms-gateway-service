@@ -6,10 +6,12 @@ import (
 	"fmt"
 	"github.com/faramarzQ/sms-gateway-service/internals/cache"
 	"github.com/faramarzQ/sms-gateway-service/internals/dtos"
+	"github.com/faramarzQ/sms-gateway-service/internals/logger"
 	"github.com/faramarzQ/sms-gateway-service/internals/repositories"
 	repoDto "github.com/faramarzQ/sms-gateway-service/internals/repositories/dtos"
 	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"strconv"
 	"sync"
 	"time"
@@ -56,10 +58,7 @@ func (s *TrafficClassifierService) Execute() error {
 
 			history, err := s.GetTrafficHistory(ctx, user.ID)
 			if err != nil {
-				return
-			}
-
-			if len(history) == 0 {
+				logger.Logger.Error("error calculating traffic history: %W", zap.Error(err))
 				return
 			}
 
@@ -85,6 +84,11 @@ func (s *TrafficClassifierService) Execute() error {
 		return err
 	}
 
+	err = s.cacheUserTrafficClass(ctx, changes)
+	if err != nil {
+		return err
+	}
+
 	return nil
 }
 
@@ -100,7 +104,7 @@ func (s *TrafficClassifierService) GetTrafficHistory(
 		t := now.Add(-time.Duration(i) * time.Hour)
 
 		key := fmt.Sprintf(
-			"user:%d:requests:%s",
+			cache.UserRequestsPerHour,
 			userID,
 			t.Format("2006010215"),
 		)
@@ -180,12 +184,19 @@ func (s *TrafficClassifierService) cacheUserTrafficClass(
 	pipe := s.redis.Pipeline()
 
 	for _, user := range users {
-		key := fmt.Sprintf("user:%d:traffic_class", user.UserID)
+		key := fmt.Sprintf(cache.UserTrafficClass, user.UserID)
+
+		payload, err := json.Marshal(dtos.UserTrafficClass{
+			Class: user.Class,
+		})
+		if err != nil {
+			return fmt.Errorf("marshal traffic class: %w", err)
+		}
 
 		pipe.Set(
 			ctx,
 			key,
-			user.Class,
+			payload,
 			24*time.Hour,
 		)
 	}

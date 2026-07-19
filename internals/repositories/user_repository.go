@@ -26,7 +26,6 @@ func (r *UserRepository) GetUserById(ctx context.Context, id uint64) (*models.Us
 	err := r.db.WithContext(ctx).
 		First(&user, id).Error
 
-	fmt.Println(id, user)
 	if err != nil {
 		return nil, err
 	}
@@ -124,4 +123,25 @@ func (r *UserRepository) BulkUpdateTrafficClass(
 
 	return r.db.WithContext(ctx).
 		Exec(caseSQL.String(), args...).Error
+}
+
+func (r *UserRepository) GetBalance(
+	ctx context.Context,
+	userID uint64,
+) (int64, error) {
+	var result struct {
+		Balance int64
+	}
+
+	err := r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Select("balance").
+		Where("id = ?", userID).
+		Take(&result).
+		Error
+	if err != nil {
+		return 0, err
+	}
+
+	return result.Balance, nil
 }

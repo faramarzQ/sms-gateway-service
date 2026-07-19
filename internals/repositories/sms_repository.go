@@ -21,6 +21,7 @@ func NewSMSRepository(db *gorm.DB) *SMSRepository {
 func (repo *SMSRepository) StoreSMS(ctx context.Context, smsDto dtos.SMSMessage) (*models.SMS, error) {
 	sms := models.SMS{
 		UserID:      smsDto.UserID,
+		ClientID:    smsDto.ClientID,
 		PhoneNumber: smsDto.PhoneNumber,
 		Message:     smsDto.Message,
 		Type:        smsDto.Type,

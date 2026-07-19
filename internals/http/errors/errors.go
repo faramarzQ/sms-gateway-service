@@ -2,4 +2,7 @@ package errors
 
 import "errors"
 
-var ErrUserNotFound = errors.New("user not found")
+type DomainError error
+
+var ErrUserNotFound DomainError = errors.New("user not found")
+var ErrUserBalanceExceeded DomainError = errors.New("user balance exceeded")

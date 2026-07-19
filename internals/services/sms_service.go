@@ -3,9 +3,11 @@ package services
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"github.com/faramarzQ/sms-gateway-service/internals/cache"
 	"github.com/faramarzQ/sms-gateway-service/internals/dtos"
+	httpErrors "github.com/faramarzQ/sms-gateway-service/internals/http/errors"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/requests"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/responses"
 	"github.com/faramarzQ/sms-gateway-service/internals/logger"
@@ -14,6 +16,7 @@ import (
 	"github.com/faramarzQ/sms-gateway-service/internals/repositories"
 	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
 	"github.com/redis/go-redis/v9"
+	"gorm.io/gorm"
 	"sync"
 	"time"
 )
@@ -24,27 +27,48 @@ type SMSService struct {
 	repo             *repositories.SMSRepository
 	messagePublisher *message_broker.Publisher
 	userService      *UserService
+	userRepository   *repositories.UserRepository
 	redis            *redis.Client
 }
 
-func NewSMSService(repo *repositories.SMSRepository, messagePublisher *message_broker.Publisher, userService *UserService, redis *redis.Client) *SMSService {
+func NewSMSService(repo *repositories.SMSRepository,
+	messagePublisher *message_broker.Publisher,
+	userService *UserService,
+	userRepository *repositories.UserRepository,
+	redis *redis.Client) *SMSService {
+
 	return &SMSService{
 		repo:             repo,
 		messagePublisher: messagePublisher,
 		userService:      userService,
+		userRepository:   userRepository,
 		redis:            redis,
 	}
 }
 
 func (s *SMSService) SendSMS(ctx context.Context, req requests.SendSMSRequest) (*responses.SendSMSErrorResponse, error) {
 	smsMessage := dtos.SMSMessage{
+		ClientID:    req.ClientID,
 		UserID:      req.UserID,
 		PhoneNumber: req.PhoneNumber,
 		Message:     req.Message,
 		Type:        req.Type,
 	}
 
-	err := s.incrementUserRequestCount(ctx, req.UserID, 12)
+	balance, err := s.userRepository.GetBalance(ctx, req.UserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserNotFound)
+		}
+
+		return nil, err
+	}
+
+	if balance == 0 {
+		return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserBalanceExceeded)
+	}
+
+	err = s.incrementUserRequestCount(ctx, req.UserID, 1)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +100,19 @@ func (s *SMSService) SendSMSBatch(ctx context.Context, req requests.SendSMSBatch
 	//defer cancel()
 	//TODO: add timeout
 
-	err := s.incrementUserRequestCount(ctx, req.UserID, len(req.Messages))
+	balance, err := s.userRepository.GetBalance(ctx, req.UserID)
+	if err != nil {
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserNotFound)
+		}
+		return nil, err
+	}
+
+	if len(req.Messages) > int(balance) {
+		return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserBalanceExceeded)
+	}
+
+	err = s.incrementUserRequestCount(ctx, req.UserID, len(req.Messages))
 	if err != nil {
 		return nil, err
 	}
@@ -158,6 +194,7 @@ func (s *SMSService) sendSingleSMS(ctx context.Context, sms dtos.SMSMessage, use
 				updateErr,
 			)
 		}
+		return nil
 	}
 
 	if err := s.messagePublisher.Publish(
@@ -246,12 +283,10 @@ func (s *SMSService) incrementUserRequestCount(
 		now.Format("2006010215"),
 	)
 
-	count, err := s.redis.IncrBy(ctx, key, int64(value)).Result()
+	_, err := s.redis.IncrBy(ctx, key, int64(value)).Result()
 	if err != nil {
 		return fmt.Errorf("increment request count: %w", err)
 	}
-
-	fmt.Println(count)
 
 	return nil
 }

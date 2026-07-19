@@ -1,8 +1,14 @@
+// @title           SMS Gateway Service API
+// @version         1.0
+// @description     REST API for sending SMS, managing user balance, and
 package main
 
 import (
 	"github.com/faramarzQ/sms-gateway-service/internals/app"
 	"github.com/faramarzQ/sms-gateway-service/internals/cache"
+eway-service/docs"
+	"github.com/faramarzQ/sms-gateway-servic
+	"github.com/faramarzQ/sms-gateway-service/internals/config"
 	"github.com/faramarzQ/sms-gateway-service/internals/database"
 	"github.com/faramarzQ/sms-gateway-service/internals/logger"
 	"github.com/faramarzQ/sms-gateway-service/internals/message_broker"
@@ -11,13 +17,18 @@ import (
 )
 
 func main() {
-	db := database.ConnectPostgres()
+	cfg, err := config.Load()
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	rabbitmq := message_broker.ConnectRabbitMQ()
+	db := database.ConnectPostgres(cfg.Postgres)
 
-	redis := cache.ConnectRedis()
+	rabbitmq := message_broker.ConnectRabbitMQ(cfg.RabbitMQ)
 
-	err := logger.Init()
+	redis := cache.ConnectRedis(cfg.Redis)
+
+	err = logger.Init()
 	if err != nil {
 		log.Fatal(err)
 	}
