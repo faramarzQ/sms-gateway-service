@@ -3,24 +3,24 @@ package app
 import "github.com/faramarzQ/sms-gateway-service/internals/services"
 
 type TrafficClassifier struct {
-	app *App
+	container *ApplicationContainer
 }
 
-func NewTrafficClassifier(app *App) Application {
+func NewTrafficClassifier(app *ApplicationContainer) Application {
 	return &TrafficClassifier{
-		app: app,
+		container: app,
 	}
 }
 
-func (a *TrafficClassifier) Build() error {
-	a.app.TrafficClassifierService = services.NewTrafficClassifierService(
-		a.app.Redis,
-		a.app.UserRepository,
+func (app *TrafficClassifier) Build() error {
+	app.container.TrafficClassifierService = services.NewTrafficClassifierService(
+		app.container.Redis,
+		app.container.UserRepository,
 	)
 
 	return nil
 }
 
-func (a *TrafficClassifier) Run() error {
-	return a.app.TrafficClassifierService.Execute()
+func (app *TrafficClassifier) Run() error {
+	return app.container.TrafficClassifierService.Execute()
 }

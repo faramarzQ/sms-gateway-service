@@ -6,27 +6,27 @@ import (
 )
 
 type MessageConsumer struct {
-	app *App
+	container *ApplicationContainer
 }
 
-func NewMessageConsumer(app *App) Application {
+func NewMessageConsumer(app *ApplicationContainer) Application {
 	return &MessageConsumer{
-		app: app,
+		container: app,
 	}
 }
 
-func (a *MessageConsumer) Build() error {
+func (app *MessageConsumer) Build() error {
 	var err error
-	a.app.MessageConsumer, err = message_broker.NewConsumer(a.app.rabbitMQ)
+	app.container.MessageConsumer, err = message_broker.NewConsumer(app.container.rabbitMQ)
 	if err != nil {
 		return err
 	}
 
-	a.app.MessageConsumerService = services.NewMessageConsumerService(a.app.MessageConsumer, a.app.SMSRepository)
+	app.container.MessageConsumerService = services.NewMessageConsumerService(app.container.MessageConsumer, app.container.SMSRepository)
 
 	return nil
 }
 
-func (a *MessageConsumer) Run() error {
-	return a.app.MessageConsumerService.Consume()
+func (app *MessageConsumer) Run() error {
+	return app.container.MessageConsumerService.Consume()
 }

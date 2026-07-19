@@ -20,6 +20,11 @@ func main() {
 
 	db := database.ConnectPostgres(cfg.Postgres)
 
+	err = database.RunMigrations(cfg.Postgres)
+	if err != nil {
+		log.Fatal(err)
+	}
+
 	rabbitmq := message_broker.ConnectRabbitMQ(cfg.RabbitMQ)
 
 	redis := cache.ConnectRedis(cfg.Redis)
@@ -31,7 +36,7 @@ func main() {
 
 	router := gin.Default()
 
-	application := app.NewApp(app.AppAPI, db, rabbitmq, redis, router)
+	application := app.NewApplicationContainer(app.AppAPI, db, rabbitmq, redis, router)
 	err = application.Build()
 	if err != nil {
 		log.Fatal("Error building application")
@@ -41,5 +46,4 @@ func main() {
 	if err != nil {
 		log.Fatal("Error running application")
 	}
-
 }

@@ -6,29 +6,29 @@ import (
 )
 
 type API struct {
-	app *App
+	container *ApplicationContainer
 }
 
-func NewAPI(app *App) Application {
+func NewAPI(app *ApplicationContainer) Application {
 	return &API{
-		app: app,
+		container: app,
 	}
 }
 
-func (a *API) Build() error {
-	a.app.UserHandler = handlers.NewUserHandler(a.app.UserService)
-	a.app.SMSHandler = handlers.NewSMSHandler(a.app.SMSService)
+func (app *API) Build() error {
+	app.container.UserHandler = handlers.NewUserHandler(app.container.UserService)
+	app.container.SMSHandler = handlers.NewSMSHandler(app.container.SMSService)
 
 	http.RegisterRoutes(
-		a.app.Router,
-		a.app.UserHandler,
-		a.app.SMSHandler,
+		app.container.Router,
+		app.container.UserHandler,
+		app.container.SMSHandler,
 	)
 
 	return nil
 }
 
-func (a *API) Run() error {
-	return a.app.Router.Run(":8080")
+func (app *API) Run() error {
+	return app.container.Router.Run(":8080")
 
 }

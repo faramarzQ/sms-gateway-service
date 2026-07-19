@@ -27,7 +27,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	application := app.NewApp(app.AppTrafficClassifier, db, rabbitmq, redis, nil)
+	application := app.NewApplicationContainer(app.AppTrafficClassifier, db, rabbitmq, redis, nil)
 	err = application.Build()
 	if err != nil {
 		log.Fatal("Error building application")

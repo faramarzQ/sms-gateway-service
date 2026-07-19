@@ -23,7 +23,7 @@ var RegisteredApplications = map[string]ApplicationFactory{
 	AppMessageConsumer:   NewMessageConsumer,
 }
 
-type App struct {
+type ApplicationContainer struct {
 	Name string
 
 	RunnableApplication Application
@@ -48,8 +48,8 @@ type App struct {
 	SMSHandler  *handlers.SMSHandler
 }
 
-func NewApp(name string, db *gorm.DB, rabbitMQ *amqp.Connection, redis *redis.Client, router *gin.Engine) *App {
-	return &App{
+func NewApplicationContainer(name string, db *gorm.DB, rabbitMQ *amqp.Connection, redis *redis.Client, router *gin.Engine) *ApplicationContainer {
+	return &ApplicationContainer{
 		Name:     name,
 		db:       db,
 		rabbitMQ: rabbitMQ,
@@ -58,15 +58,15 @@ func NewApp(name string, db *gorm.DB, rabbitMQ *amqp.Connection, redis *redis.Cl
 	}
 }
 
-func (app *App) Build() error {
-	err := app.BuildDependencies()
+func (c *ApplicationContainer) Build() error {
+	err := c.BuildDependencies()
 	if err != nil {
 		return err
 	}
 
-	app.RunnableApplication = RegisteredApplications[app.Name](app)
+	c.RunnableApplication = RegisteredApplications[c.Name](c)
 
-	err = app.RunnableApplication.Build()
+	err = c.RunnableApplication.Build()
 	if err != nil {
 		return err
 	}
@@ -74,22 +74,22 @@ func (app *App) Build() error {
 	return nil
 }
 
-func (app *App) BuildDependencies() error {
+func (c *ApplicationContainer) BuildDependencies() error {
 	var err error
-	app.MessagePublisher, err = message_broker.NewPublisher(app.rabbitMQ)
+	c.MessagePublisher, err = message_broker.NewPublisher(c.rabbitMQ)
 	if err != nil {
 		return err
 	}
 
-	app.UserRepository = repositories.NewUserRepository(app.db)
-	app.SMSRepository = repositories.NewSMSRepository(app.db)
+	c.UserRepository = repositories.NewUserRepository(c.db)
+	c.SMSRepository = repositories.NewSMSRepository(c.db)
 
-	app.UserService = services.NewUserService(app.UserRepository, app.Redis)
-	app.SMSService = services.NewSMSService(app.SMSRepository, app.MessagePublisher, app.UserService, app.UserRepository, app.Redis)
+	c.UserService = services.NewUserService(c.UserRepository, c.Redis)
+	c.SMSService = services.NewSMSService(c.SMSRepository, c.MessagePublisher, c.UserService, c.UserRepository, c.Redis)
 
 	return nil
 }
 
-func (app *App) Run() error {
-	return app.RunnableApplication.Run()
+func (c *ApplicationContainer) Run() error {
+	return c.RunnableApplication.Run()
 }

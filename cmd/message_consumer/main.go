@@ -24,7 +24,7 @@ func main() {
 		log.Fatal(err)
 	}
 
-	application := app.NewApp(app.AppMessageConsumer, db, rabbitmq, nil, nil)
+	application := app.NewApplicationContainer(app.AppMessageConsumer, db, rabbitmq, nil, nil)
 	err = application.Build()
 	if err != nil {
 		log.Fatal("Error building application")

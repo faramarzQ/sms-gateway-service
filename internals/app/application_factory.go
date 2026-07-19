@@ -1,3 +1,3 @@
 package app
 
-type ApplicationFactory func(*App) Application
+type ApplicationFactory func(*ApplicationContainer) Application
