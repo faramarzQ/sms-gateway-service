@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/faramarzQ/sms-gateway-service/internals/http"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/handlers"
+	"github.com/faramarzQ/sms-gateway-service/internals/middlewares"
 )
 
 type API struct {
@@ -19,6 +20,8 @@ func (app *API) Build() error {
 	app.container.UserHandler = handlers.NewUserHandler(app.container.UserService)
 	app.container.SMSHandler = handlers.NewSMSHandler(app.container.SMSService)
 
+	app.registerMiddlewares()
+
 	http.RegisterRoutes(
 		app.container.Router,
 		app.container.UserHandler,
@@ -31,4 +34,10 @@ func (app *API) Build() error {
 func (app *API) Run() error {
 	return app.container.Router.Run(":8080")
 
+}
+
+func (app *API) registerMiddlewares() {
+	app.container.Router.Use(
+		middlewares.RateLimiter(app.container.Redis),
+	)
 }
