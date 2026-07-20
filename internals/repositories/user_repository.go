@@ -145,3 +145,37 @@ func (r *UserRepository) GetBalance(
 
 	return result.Balance, nil
 }
+
+func (r *UserRepository) HasBalance(
+	ctx context.Context,
+	userID uint64,
+	amount int,
+) (bool, error) {
+	var result struct {
+		Balance int
+	}
+
+	err := r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Select("balance").
+		Where("id = ?", userID).
+		Take(&result).
+		Error
+	if err != nil {
+		return false, err
+	}
+
+	return result.Balance >= amount, nil
+}
+
+func (r *UserRepository) ConsumeBalance(
+	ctx context.Context,
+	userID uint64,
+	amount uint64,
+) error {
+	return r.db.WithContext(ctx).
+		Model(&models.User{}).
+		Where("id = ? AND balance >= ?", userID, amount).
+		Update("balance", gorm.Expr("balance - ?", amount)).Error
+
+}

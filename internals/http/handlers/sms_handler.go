@@ -5,6 +5,7 @@ import (
 	httpErrors "github.com/faramarzQ/sms-gateway-service/internals/http/errors"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/requests"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/responses"
+	"github.com/faramarzQ/sms-gateway-service/internals/logger"
 	"github.com/faramarzQ/sms-gateway-service/internals/services"
 	"github.com/gin-gonic/gin"
 	"net/http"
@@ -46,15 +47,15 @@ func (h *SMSHandler) SendSMS(c *gin.Context) {
 	responseError, err := h.smsService.SendSMS(c, req)
 
 	if err != nil {
-		if errors.Is(err, httpErrors.ErrUserBalanceExceeded) {
-			c.JSON(http.StatusPaymentRequired, responses.Response{
-				Status:  http.StatusPaymentRequired,
-				Message: "failed",
-				Data:    responseError,
+		if httpErrors.IsDomainError(err) {
+			c.JSON(http.StatusBadRequest, responses.Response{
+				Status:  http.StatusBadRequest,
+				Message: err.Error(),
 			})
 			return
 		}
 
+		logger.Logger.Error(err.Error())
 		c.JSON(http.StatusInternalServerError, responses.Response{
 			Status:  http.StatusInternalServerError,
 			Message: "internal server error",
@@ -96,7 +97,7 @@ func (h *SMSHandler) SendSMSBatch(c *gin.Context) {
 		if errors.Is(err, httpErrors.ErrUserBalanceExceeded) {
 			c.JSON(http.StatusPaymentRequired, responses.Response{
 				Status:  http.StatusPaymentRequired,
-				Message: "failed",
+				Message: err.Error(),
 				Data:    responseError,
 			})
 			return

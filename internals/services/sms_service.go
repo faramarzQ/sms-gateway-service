@@ -16,6 +16,7 @@ import (
 	"github.com/faramarzQ/sms-gateway-service/internals/repositories"
 	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"sync"
 	"time"
@@ -55,23 +56,30 @@ func (s *SMSService) SendSMS(ctx context.Context, req requests.SendSMSRequest) (
 		Type:        req.Type,
 	}
 
-	balance, err := s.userRepository.GetBalance(ctx, req.UserID)
+	hasBalance, err := s.userRepository.HasBalance(ctx, req.UserID, 1)
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserNotFound)
+			return nil, httpErrors.ErrUserNotFound
 		}
 
 		return nil, err
 	}
 
-	if balance == 0 {
-		return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserBalanceExceeded)
+	if !hasBalance {
+		return nil, httpErrors.ErrUserBalanceExceeded
 	}
 
-	err = s.incrementUserRequestCount(ctx, req.UserID, 1)
-	if err != nil {
-		return nil, err
-	}
+	// cache user request count in bucket
+	go func() {
+		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
+		defer cancel()
+
+		if err := s.incrementUserRequestCount(ctx, req.UserID, 1); err != nil {
+			logger.Logger.Error("increment request count failed",
+				zap.Error(err),
+			)
+		}
+	}()
 
 	smsErrors := responses.SendSMSErrorResponse{}
 	userTrafficClass, err := s.userService.GetUserTrafficClass(ctx, req.UserID)
@@ -83,8 +91,15 @@ func (s *SMSService) SendSMS(ctx context.Context, req requests.SendSMSRequest) (
 		return &smsErrors, err
 	}
 
-	err = s.sendSingleSMS(ctx, smsMessage, *userTrafficClass)
+	err = s.storeAndPublishSingleSMS(ctx, smsMessage, *userTrafficClass)
 	if err != nil {
+		if httpErrors.IsDomainError(err) {
+			smsErrors.Errors = append(smsErrors.Errors, responses.SendSMSError{
+				Message:  err.Error(),
+				ClientId: req.ClientID,
+			})
+			return &smsErrors, err
+		}
 		smsErrors.Errors = append(smsErrors.Errors, responses.SendSMSError{
 			Message:  "failed sending sms",
 			ClientId: req.ClientID,
@@ -92,30 +107,105 @@ func (s *SMSService) SendSMS(ctx context.Context, req requests.SendSMSRequest) (
 		return &smsErrors, err
 	}
 
-	return nil, nil
+	return &smsErrors, nil
+}
+
+func (s *SMSService) storeAndPublishSingleSMS(ctx context.Context, sms dtos.SMSMessage, userTrafficClass value_objects.TrafficClass) error {
+
+	//NOTE: if consistency matters more, do a check on redundancy of sms.ClientID
+	//NOTE: if consistency matters more, commit StoreSMS and ConsumeBalance in a transaction
+	//NOTE: if consistency matters more, use outbox pattern
+
+	err := s.userRepository.ConsumeBalance(ctx, sms.UserID, 1)
+	if err != nil {
+		if rollbackErr := s.repo.UpdateStatus(
+			ctx,
+			sms.ID,
+			models.SMSStatusFailed,
+		); rollbackErr != nil {
+			return fmt.Errorf(
+				"publish sms failed: %v, consume balance failed: %w",
+				err,
+				rollbackErr,
+			)
+		}
+		if errors.Is(err, gorm.ErrRecordNotFound) {
+			return httpErrors.ErrUserNotFound
+		}
+		return err
+	}
+
+	smsRow, err := s.repo.StoreSMS(ctx, sms)
+	if err != nil {
+		return err
+	}
+
+	sms.ID = smsRow.ID
+
+	body, err := json.Marshal(sms)
+	if err != nil {
+		return fmt.Errorf("marshal sms: %w", err)
+	}
+
+	routingKey := s.CalculateRoutingKey(sms.Type, userTrafficClass)
+
+	if err := s.messagePublisher.Publish(
+		ctx,
+		routingKey,
+		body,
+	); err != nil {
+		// rollback
+		if rollbackErr := s.repo.UpdateStatus(
+			ctx,
+			sms.ID,
+			models.SMSStatusFailed,
+		); rollbackErr != nil {
+			return fmt.Errorf(
+				"publish sms failed: %v, update status failed: %w",
+				err,
+				rollbackErr,
+			)
+		}
+
+		if rollbackErr := s.userRepository.IncreaseBalance(ctx, sms.UserID, 1); rollbackErr != nil {
+			return fmt.Errorf(
+				"publish sms failed: %v, rollback balance failed: %w",
+				err,
+				rollbackErr,
+			)
+		}
+	}
+
+	return nil
 }
 
 func (s *SMSService) SendSMSBatch(ctx context.Context, req requests.SendSMSBatchRequest) (*responses.SendSMSErrorResponse, error) {
-	//ctx, cancel := context.WithTimeout(ctx, 5*time.Second)
-	//defer cancel()
-	//TODO: add timeout
+	// NOTE: if availability matters more, store all messages as batch in db
 
-	balance, err := s.userRepository.GetBalance(ctx, req.UserID)
+	hasBalance, err := s.userRepository.HasBalance(ctx, req.UserID, len(req.Messages))
 	if err != nil {
 		if errors.Is(err, gorm.ErrRecordNotFound) {
-			return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserNotFound)
+			return nil, httpErrors.ErrUserNotFound
 		}
+
 		return nil, err
 	}
 
-	if len(req.Messages) > int(balance) {
-		return nil, fmt.Errorf("failed: %w", httpErrors.ErrUserBalanceExceeded)
+	if !hasBalance {
+		return nil, httpErrors.ErrUserBalanceExceeded
 	}
 
-	err = s.incrementUserRequestCount(ctx, req.UserID, len(req.Messages))
-	if err != nil {
-		return nil, err
-	}
+	// cache user request count in bucket
+	go func() {
+		cacheCtx, cancel := context.WithTimeout(context.Background(), 20*time.Second)
+		defer cancel()
+
+		if err := s.incrementUserRequestCount(cacheCtx, req.UserID, len(req.Messages)); err != nil {
+			logger.Logger.Error("increment request count failed",
+				zap.Error(err),
+			)
+		}
+	}()
 
 	userTrafficClass, err := s.userService.GetUserTrafficClass(ctx, req.UserID)
 	if err != nil {
@@ -129,13 +219,13 @@ func (s *SMSService) SendSMSBatch(ctx context.Context, req requests.SendSMSBatch
 	var mu sync.Mutex
 
 	for i, message := range req.Messages {
+
+		semaphore <- struct{}{}
+
 		wg.Add(1)
 
 		go func(id int, message requests.SMSRequest) {
 			defer wg.Done()
-
-			// acquire semaphore
-			semaphore <- struct{}{}
 			defer func() {
 				// release semaphore
 				<-semaphore
@@ -148,8 +238,19 @@ func (s *SMSService) SendSMSBatch(ctx context.Context, req requests.SendSMSBatch
 				Type:        message.Type,
 			}
 
-			err = s.sendSingleSMS(ctx, smsMessage, *userTrafficClass)
+			err := s.storeAndPublishSingleSMS(ctx, smsMessage, *userTrafficClass)
 			if err != nil {
+				if httpErrors.IsDomainError(err) {
+					mu.Lock()
+					smsErrors.Errors = append(smsErrors.Errors, responses.SendSMSError{
+						Message:  err.Error(),
+						ClientId: message.ClientID,
+					})
+					mu.Unlock()
+
+					return
+				}
+
 				logger.Logger.Error(err.Error())
 
 				mu.Lock()
@@ -158,6 +259,8 @@ func (s *SMSService) SendSMSBatch(ctx context.Context, req requests.SendSMSBatch
 					ClientId: message.ClientID,
 				})
 				mu.Unlock()
+
+				return
 			}
 
 		}(i, message)
@@ -168,58 +271,7 @@ func (s *SMSService) SendSMSBatch(ctx context.Context, req requests.SendSMSBatch
 	return &smsErrors, nil
 }
 
-func (s *SMSService) sendSingleSMS(ctx context.Context, sms dtos.SMSMessage, userTrafficClass value_objects.TrafficClass) error {
-	smsRow, err := s.repo.StoreSMS(ctx, sms)
-	if err != nil {
-		return err
-	}
-
-	sms.ID = smsRow.ID
-
-	body, err := json.Marshal(sms)
-	if err != nil {
-		return fmt.Errorf("marshal sms: %w", err)
-	}
-
-	routingKey := s.GetRoutingKey(sms.Type, userTrafficClass)
-	if routingKey == "" {
-		if updateErr := s.repo.UpdateStatus(
-			ctx,
-			sms.ID,
-			models.SMSStatusRejected,
-		); updateErr != nil {
-			return fmt.Errorf(
-				"publish sms failed: %v, update status failed: %w",
-				err,
-				updateErr,
-			)
-		}
-		return nil
-	}
-
-	if err := s.messagePublisher.Publish(
-		ctx,
-		routingKey,
-		body,
-	); err != nil {
-
-		if updateErr := s.repo.UpdateStatus(
-			ctx,
-			sms.ID,
-			models.SMSStatusRejected,
-		); updateErr != nil {
-			return fmt.Errorf(
-				"publish sms failed: %v, update status failed: %w",
-				err,
-				updateErr,
-			)
-		}
-	}
-
-	return nil
-}
-
-func (*SMSService) GetRoutingKey(smsType value_objects.SMSType, userTrafficClass value_objects.TrafficClass) string {
+func (*SMSService) CalculateRoutingKey(smsType value_objects.SMSType, userTrafficClass value_objects.TrafficClass) string {
 	switch userTrafficClass {
 	case value_objects.TrafficClassStandard:
 		switch smsType {
@@ -240,7 +292,8 @@ func (*SMSService) GetRoutingKey(smsType value_objects.SMSType, userTrafficClass
 		}
 	}
 
-	return ""
+	logger.Logger.Error(fmt.Sprintf("failed calculate routing key: sms type: %s , traffic class: %s", smsType, userTrafficClass))
+	return "standard"
 }
 
 func (s *SMSService) GetReport(ctx context.Context, userId uint64) (*responses.UserSMSReportResponse, error) {

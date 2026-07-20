@@ -1,8 +1,21 @@
 package errors
 
-import "errors"
+import (
+	"errors"
+)
 
-type DomainError error
+type DomainError struct {
+	msg string
+}
 
-var ErrUserNotFound DomainError = errors.New("user not found")
-var ErrUserBalanceExceeded DomainError = errors.New("user balance exceeded")
+func (e *DomainError) Error() string {
+	return e.msg
+}
+
+func IsDomainError(err error) bool {
+	_, ok := errors.AsType[*DomainError](err)
+	return ok
+}
+
+var ErrUserNotFound = &DomainError{"user not found"}
+var ErrUserBalanceExceeded = &DomainError{"user balance exceeded"}

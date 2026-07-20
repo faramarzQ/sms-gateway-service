@@ -10,6 +10,7 @@ type SMSStatus string
 const SMSStatusPending SMSStatus = "pending"
 const SMSStatusRejected SMSStatus = "rejected"
 const SMSStatusDelivered SMSStatus = "delivered"
+const SMSStatusFailed SMSStatus = "failed"
 
 type SMS struct {
 	ID uint64 `gorm:"primaryKey"`
