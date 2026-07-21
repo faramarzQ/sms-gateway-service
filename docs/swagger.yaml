@@ -189,12 +189,17 @@ definitions:
 info:
   contact: {}
 paths:
-  /sms/:
+  /api/sms:
     post:
       consumes:
       - application/json
       description: Queues one SMS message for delivery
       parameters:
+      - description: User ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
       - description: SMS payload
         in: body
         name: body
@@ -223,12 +228,17 @@ paths:
       summary: Send a single SMS
       tags:
       - sms
-  /sms/batch:
+  /api/sms/batch:
     post:
       consumes:
       - application/json
       description: Queues multiple SMS messages for delivery concurrently
       parameters:
+      - description: User ID
+        in: header
+        name: X-User-ID
+        required: true
+        type: integer
       - description: Batch SMS payload
         in: body
         name: body
@@ -257,13 +267,18 @@ paths:
       summary: Send SMS in batch
       tags:
       - sms
-  /sms/report:
+  /api/sms/report:
     get:
-      description: Returns all SMS records for the given user
+      description: Returns all SMS records for the specified user
       parameters:
       - description: User ID
         in: query
         name: user_id
+        required: true
+        type: integer
+      - description: User ID
+        in: header
+        name: X-User-ID
         required: true
         type: integer
       produces:
@@ -276,9 +291,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -290,13 +303,18 @@ paths:
       summary: Get SMS report for user
       tags:
       - sms
-  /user/{id}:
+  /api/user/{id}:
     get:
-      description: Returns user details including balance and traffic class
+      description: Returns the user's details, including balance and traffic class
       parameters:
       - description: User ID
         in: path
         name: id
+        required: true
+        type: integer
+      - description: User ID
+        in: header
+        name: X-User-ID
         required: true
         type: integer
       produces:
@@ -309,9 +327,7 @@ paths:
         "400":
           description: Bad Request
           schema:
-            additionalProperties:
-              type: string
-            type: object
+            $ref: '#/definitions/responses.ErrorResponse'
         "404":
           description: Not Found
           schema:
@@ -320,18 +336,23 @@ paths:
           description: Internal Server Error
           schema:
             $ref: '#/definitions/responses.ErrorResponse'
-      summary: Get user by ID
+      summary: Get current user
       tags:
       - user
-  /user/{id}/balance:
+  /api/user/{id}/balance:
     put:
       consumes:
       - application/json
-      description: Adds credits to a user's SMS balance
+      description: Adds credits to the user's SMS balance
       parameters:
       - description: User ID
         in: path
         name: id
+        required: true
+        type: integer
+      - description: User ID
+        in: header
+        name: X-User-ID
         required: true
         type: integer
       - description: Amount to add

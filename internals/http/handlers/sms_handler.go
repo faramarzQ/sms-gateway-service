@@ -28,12 +28,13 @@ func NewSMSHandler(smsService *services.SMSService) *SMSHandler {
 // @Tags         sms
 // @Accept       json
 // @Produce      json
-// @Param        body  body      requests.SendSMSRequest  true  "SMS payload"
-// @Success      200   {object}  responses.SendSMSErrorDataResponse
-// @Failure      400   {object}  responses.ErrorResponse
-// @Failure      402   {object}  responses.SendSMSErrorDataResponse
-// @Failure      500   {object}  responses.ErrorResponse
-// @Router       /sms/ [post]
+// @Param        X-User-ID  header    integer                   true  "User ID"
+// @Param        body       body      requests.SendSMSRequest   true  "SMS payload"
+// @Success      200        {object}  responses.SendSMSErrorDataResponse
+// @Failure      400        {object}  responses.ErrorResponse
+// @Failure      402        {object}  responses.SendSMSErrorDataResponse
+// @Failure      500        {object}  responses.ErrorResponse
+// @Router       /api/sms [post]
 func (h *SMSHandler) SendSMS(c *gin.Context) {
 	var req requests.SendSMSRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -76,12 +77,13 @@ func (h *SMSHandler) SendSMS(c *gin.Context) {
 // @Tags         sms
 // @Accept       json
 // @Produce      json
-// @Param        body  body      requests.SendSMSBatchRequest  true  "Batch SMS payload"
-// @Success      200   {object}  responses.SendSMSErrorDataResponse
-// @Failure      400   {object}  responses.ErrorResponse
-// @Failure      402   {object}  responses.SendSMSErrorDataResponse
-// @Failure      500   {object}  responses.ErrorResponse
-// @Router       /sms/batch [post]
+// @Param        X-User-ID  header    int                             true  "User ID"
+// @Param        body       body      requests.SendSMSBatchRequest    true  "Batch SMS payload"
+// @Success      200        {object}  responses.SendSMSErrorDataResponse
+// @Failure      400        {object}  responses.ErrorResponse
+// @Failure      402        {object}  responses.SendSMSErrorDataResponse
+// @Failure      500        {object}  responses.ErrorResponse
+// @Router       /api/sms/batch [post]
 func (h *SMSHandler) SendSMSBatch(c *gin.Context) {
 	var req requests.SendSMSBatchRequest
 	if err := c.ShouldBindJSON(&req); err != nil {
@@ -119,22 +121,24 @@ func (h *SMSHandler) SendSMSBatch(c *gin.Context) {
 
 // GetReport godoc
 // @Summary      Get SMS report for user
-// @Description  Returns all SMS records for the given user
+// @Description  Returns all SMS records for the specified user
 // @Tags         sms
 // @Produce      json
-// @Param        user_id  query     int  true  "User ID"
+// @Param        user_id    query   integer  true  "User ID"
+// @Param        X-User-ID  header  int      true  "User ID"
 // @Success      200      {object}  responses.SMSReportDataResponse
-// @Failure      400      {object}  map[string]string
+// @Failure      400      {object}  responses.ErrorResponse
 // @Failure      404      {object}  responses.ErrorResponse
 // @Failure      500      {object}  responses.ErrorResponse
-// @Router       /sms/report [get]
+// @Router       /api/sms/report [get]
 func (h *SMSHandler) GetReport(c *gin.Context) {
 	userIdStr := c.Query("user_id")
 
 	userId, err := strconv.ParseUint(userIdStr, 10, 64)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{
-			"error": "invalid user_id",
+		c.JSON(http.StatusBadRequest, responses.Response{
+			Status:  http.StatusBadRequest,
+			Message: "invalid user id",
 		})
 		return
 	}

@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/faramarzQ/sms-gateway-service/internals/http/handlers"
 	"github.com/faramarzQ/sms-gateway-service/internals/message_broker"
+	"github.com/faramarzQ/sms-gateway-service/internals/middlewares"
 	"github.com/faramarzQ/sms-gateway-service/internals/repositories"
 	"github.com/faramarzQ/sms-gateway-service/internals/services"
 	"github.com/gin-gonic/gin"
@@ -46,6 +47,8 @@ type ApplicationContainer struct {
 
 	UserHandler *handlers.UserHandler
 	SMSHandler  *handlers.SMSHandler
+
+	RateLimiterMiddleware *middlewares.RateLimitMiddleware
 }
 
 func NewApplicationContainer(name string, db *gorm.DB, rabbitMQ *amqp.Connection, redis *redis.Client, router *gin.Engine) *ApplicationContainer {

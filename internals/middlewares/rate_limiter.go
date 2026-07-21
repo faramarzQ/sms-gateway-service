@@ -13,11 +13,19 @@ import (
 )
 
 const (
-	RateLimit = 3
+	RateLimit = 100
 	Window    = time.Minute
 )
 
-func RateLimiter(redis *redis.Client) gin.HandlerFunc {
+type RateLimitMiddleware struct {
+	Redis *redis.Client
+}
+
+func NewRateLimitMiddleware(Redis *redis.Client) *RateLimitMiddleware {
+	return &RateLimitMiddleware{Redis: Redis}
+}
+
+func (m *RateLimitMiddleware) Handler() gin.HandlerFunc {
 	return func(c *gin.Context) {
 
 		userIDHeader := c.GetHeader("X-User-ID")
@@ -53,7 +61,7 @@ func RateLimiter(redis *redis.Client) gin.HandlerFunc {
 
 		ctx := c.Request.Context()
 
-		count, err := redis.Incr(ctx, key).Result()
+		count, err := m.Redis.Incr(ctx, key).Result()
 		if err != nil {
 			logger.Logger.Error("failed storing rate limit", zap.Error(err))
 
@@ -68,7 +76,7 @@ func RateLimiter(redis *redis.Client) gin.HandlerFunc {
 
 		// first request in this window
 		if count == 1 {
-			redis.Expire(ctx, key, Window)
+			m.Redis.Expire(ctx, key, Window)
 		}
 
 		if count > RateLimit {

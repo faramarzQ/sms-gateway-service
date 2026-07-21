@@ -15,7 +15,7 @@ const docTemplate = `{
     "host": "{{.Host}}",
     "basePath": "{{.BasePath}}",
     "paths": {
-        "/sms/": {
+        "/api/sms": {
             "post": {
                 "description": "Queues one SMS message for delivery",
                 "consumes": [
@@ -29,6 +29,13 @@ const docTemplate = `{
                 ],
                 "summary": "Send a single SMS",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "description": "SMS payload",
                         "name": "body",
@@ -67,7 +74,7 @@ const docTemplate = `{
                 }
             }
         },
-        "/sms/batch": {
+        "/api/sms/batch": {
             "post": {
                 "description": "Queues multiple SMS messages for delivery concurrently",
                 "consumes": [
@@ -81,6 +88,13 @@ const docTemplate = `{
                 ],
                 "summary": "Send SMS in batch",
                 "parameters": [
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
+                    },
                     {
                         "description": "Batch SMS payload",
                         "name": "body",
@@ -119,9 +133,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/sms/report": {
+        "/api/sms/report": {
             "get": {
-                "description": "Returns all SMS records for the given user",
+                "description": "Returns all SMS records for the specified user",
                 "produces": [
                     "application/json"
                 ],
@@ -136,6 +150,13 @@ const docTemplate = `{
                         "name": "user_id",
                         "in": "query",
                         "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "X-User-ID",
+                        "in": "header",
+                        "required": true
                     }
                 ],
                 "responses": {
@@ -148,10 +169,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
@@ -169,22 +187,29 @@ const docTemplate = `{
                 }
             }
         },
-        "/user/{id}": {
+        "/api/user/{id}": {
             "get": {
-                "description": "Returns user details including balance and traffic class",
+                "description": "Returns the user's details, including balance and traffic class",
                 "produces": [
                     "application/json"
                 ],
                 "tags": [
                     "user"
                 ],
-                "summary": "Get user by ID",
+                "summary": "Get current user",
                 "parameters": [
                     {
                         "type": "integer",
                         "description": "User ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "X-User-ID",
+                        "in": "header",
                         "required": true
                     }
                 ],
@@ -198,10 +223,7 @@ const docTemplate = `{
                     "400": {
                         "description": "Bad Request",
                         "schema": {
-                            "type": "object",
-                            "additionalProperties": {
-                                "type": "string"
-                            }
+                            "$ref": "#/definitions/responses.ErrorResponse"
                         }
                     },
                     "404": {
@@ -219,9 +241,9 @@ const docTemplate = `{
                 }
             }
         },
-        "/user/{id}/balance": {
+        "/api/user/{id}/balance": {
             "put": {
-                "description": "Adds credits to a user's SMS balance",
+                "description": "Adds credits to the user's SMS balance",
                 "consumes": [
                     "application/json"
                 ],
@@ -238,6 +260,13 @@ const docTemplate = `{
                         "description": "User ID",
                         "name": "id",
                         "in": "path",
+                        "required": true
+                    },
+                    {
+                        "type": "integer",
+                        "description": "User ID",
+                        "name": "X-User-ID",
+                        "in": "header",
                         "required": true
                     },
                     {

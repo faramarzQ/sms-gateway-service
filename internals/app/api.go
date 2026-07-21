@@ -26,6 +26,7 @@ func (app *API) Build() error {
 		app.container.Router,
 		app.container.UserHandler,
 		app.container.SMSHandler,
+		app.container.RateLimiterMiddleware,
 	)
 
 	return nil
@@ -37,7 +38,5 @@ func (app *API) Run() error {
 }
 
 func (app *API) registerMiddlewares() {
-	app.container.Router.Use(
-		middlewares.RateLimiter(app.container.Redis),
-	)
+	app.container.RateLimiterMiddleware = middlewares.NewRateLimitMiddleware(app.container.Redis)
 }
