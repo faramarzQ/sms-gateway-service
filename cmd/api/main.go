@@ -29,7 +29,7 @@ func main() {
 
 	redis := cache.ConnectRedis(cfg.Redis)
 
-	err = logger.Init()
+	err = logger.Init(app.AppAPI)
 	if err != nil {
 		log.Fatal(err)
 	}

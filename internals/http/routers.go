@@ -15,6 +15,13 @@ func RegisterRoutes(ginRouter *gin.Engine,
 ) {
 	ginRouter.GET("/swagger/*any", ginSwagger.WrapHandler(swaggerFiles.Handler))
 
+	// Health check
+	ginRouter.GET("/health", func(c *gin.Context) {
+		c.JSON(200, gin.H{
+			"status": "ok",
+		})
+	})
+
 	api := ginRouter.Group("/api")
 
 	api.Use(rateLimiterMiddleware.Handler())

@@ -19,7 +19,7 @@ func main() {
 
 	rabbitmq := message_broker.ConnectRabbitMQ(cfg.RabbitMQ)
 
-	err = logger.Init()
+	err = logger.Init(app.AppMessageConsumer)
 	if err != nil {
 		log.Fatal(err)
 	}

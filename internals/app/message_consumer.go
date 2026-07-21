@@ -3,6 +3,7 @@ package app
 import (
 	"github.com/faramarzQ/sms-gateway-service/internals/message_broker"
 	"github.com/faramarzQ/sms-gateway-service/internals/services"
+	"net/http"
 )
 
 type MessageConsumer struct {
@@ -28,5 +29,16 @@ func (app *MessageConsumer) Build() error {
 }
 
 func (app *MessageConsumer) Run() error {
+
+	go startHealthServer()
+
 	return app.container.MessageConsumerService.Consume()
+}
+
+func startHealthServer() {
+	http.HandleFunc("/health", func(w http.ResponseWriter, r *http.Request) {
+		w.WriteHeader(http.StatusOK)
+	})
+
+	_ = http.ListenAndServe(":8080", nil)
 }

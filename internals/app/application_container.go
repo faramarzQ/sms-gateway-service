@@ -14,8 +14,8 @@ import (
 
 const (
 	AppAPI               string = "API"
-	AppTrafficClassifier string = "Traffic Classifier"
-	AppMessageConsumer   string = "Message Consumer"
+	AppTrafficClassifier string = "Traffic_Classifier"
+	AppMessageConsumer   string = "Message_Consumer"
 )
 
 var RegisteredApplications = map[string]ApplicationFactory{

@@ -22,7 +22,7 @@ func main() {
 
 	redis := cache.ConnectRedis(cfg.Redis)
 
-	err = logger.Init()
+	err = logger.Init(app.AppTrafficClassifier)
 	if err != nil {
 		log.Fatal(err)
 	}

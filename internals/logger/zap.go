@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"go.uber.org/zap"
 	"sync"
 )
@@ -10,13 +11,13 @@ var (
 	once   sync.Once
 )
 
-func Init() error {
+func Init(appName string) error {
 	var err error
 
 	once.Do(func() {
 		cfg := zap.NewProductionConfig()
-		cfg.OutputPaths = []string{"logs/app.log"}
-		cfg.ErrorOutputPaths = []string{"logs/error.log"}
+		logFile := fmt.Sprintf("logs/%s.log", appName)
+		cfg.OutputPaths = []string{logFile}
 
 		Logger, err = cfg.Build()
 	})
