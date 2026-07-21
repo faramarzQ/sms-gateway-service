@@ -22,10 +22,10 @@ const BulkTrafficThreshold = 500
 
 type TrafficClassifierService struct {
 	redis          *redis.Client
-	userRepository *repositories.UserRepository
+	userRepository repositories.UserRepositoryInterface
 }
 
-func NewTrafficClassifierService(redis *redis.Client, userRepo *repositories.UserRepository) *TrafficClassifierService {
+func NewTrafficClassifierService(redis *redis.Client, userRepo repositories.UserRepositoryInterface) *TrafficClassifierService {
 	return &TrafficClassifierService{
 		redis:          redis,
 		userRepository: userRepo,

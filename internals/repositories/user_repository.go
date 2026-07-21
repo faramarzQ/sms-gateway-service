@@ -15,6 +15,28 @@ type UserRepository struct {
 	db *gorm.DB
 }
 
+type UserRepositoryInterface interface {
+	GetUserById(ctx context.Context, id uint64) (*models.User, error)
+
+	ExistsById(ctx context.Context, id uint64) (bool, error)
+
+	IncreaseBalance(ctx context.Context, id uint64, amount int64) error
+
+	GetUserTrafficClass(ctx context.Context, userID uint64) (*value_objects.TrafficClass, error)
+
+	GetAllUsersTrafficInfo(ctx context.Context) ([]repoDtos.UserTrafficInfo, error)
+
+	UpdateTrafficClass(ctx context.Context, userID uint64, class value_objects.TrafficClass) error
+
+	BulkUpdateTrafficClass(ctx context.Context, changes []dtos.TrafficClassChange) error
+
+	GetBalance(ctx context.Context, userID uint64) (int64, error)
+
+	HasBalance(ctx context.Context, userID uint64, amount int) (bool, error)
+
+	ConsumeBalance(ctx context.Context, userID uint64, amount uint64) error
+}
+
 func NewUserRepository(db *gorm.DB) *UserRepository {
 	return &UserRepository{
 		db: db,

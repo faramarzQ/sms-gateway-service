@@ -20,11 +20,11 @@ import (
 )
 
 type UserService struct {
-	repo  *repositories.UserRepository
+	repo  repositories.UserRepositoryInterface
 	redis *redis.Client
 }
 
-func NewUserService(userRepo *repositories.UserRepository, redis *redis.Client) *UserService {
+func NewUserService(userRepo repositories.UserRepositoryInterface, redis *redis.Client) *UserService {
 	return &UserService{
 		repo:  userRepo,
 		redis: redis,

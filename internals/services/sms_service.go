@@ -25,17 +25,17 @@ import (
 const max_concurrent_sms_batch = 20
 
 type SMSService struct {
-	repo             *repositories.SMSRepository
+	repo             repositories.SMSRepositoryInterface
 	messagePublisher *message_broker.Publisher
 	userService      *UserService
-	userRepository   *repositories.UserRepository
+	userRepository   repositories.UserRepositoryInterface
 	redis            *redis.Client
 }
 
-func NewSMSService(repo *repositories.SMSRepository,
+func NewSMSService(repo repositories.SMSRepositoryInterface,
 	messagePublisher *message_broker.Publisher,
 	userService *UserService,
-	userRepository *repositories.UserRepository,
+	userRepository repositories.UserRepositoryInterface,
 	redis *redis.Client) *SMSService {
 
 	return &SMSService{

@@ -14,10 +14,10 @@ import (
 
 type MessageConsumerService struct {
 	messageConsumer *message_broker.Consumer
-	smsRepository   *repositories.SMSRepository
+	smsRepository   repositories.SMSRepositoryInterface
 }
 
-func NewMessageConsumerService(messageConsumer *message_broker.Consumer, smsRepository *repositories.SMSRepository) *MessageConsumerService {
+func NewMessageConsumerService(messageConsumer *message_broker.Consumer, smsRepository repositories.SMSRepositoryInterface) *MessageConsumerService {
 	return &MessageConsumerService{
 		messageConsumer: messageConsumer,
 		smsRepository:   smsRepository,

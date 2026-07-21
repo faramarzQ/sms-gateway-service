@@ -37,8 +37,8 @@ type ApplicationContainer struct {
 	MessagePublisher *message_broker.Publisher
 	MessageConsumer  *message_broker.Consumer
 
-	UserRepository *repositories.UserRepository
-	SMSRepository  *repositories.SMSRepository
+	UserRepository repositories.UserRepositoryInterface
+	SMSRepository  repositories.SMSRepositoryInterface
 
 	UserService              *services.UserService
 	SMSService               *services.SMSService

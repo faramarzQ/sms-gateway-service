@@ -12,6 +12,21 @@ type SMSRepository struct {
 	db *gorm.DB
 }
 
+type SMSRepositoryInterface interface {
+	StoreSMS(ctx context.Context, sms dtos.SMSMessage) (*models.SMS, error)
+
+	UpdateStatus(
+		ctx context.Context,
+		id uint64,
+		status models.SMSStatus,
+	) error
+
+	GetUserSMS(
+		ctx context.Context,
+		userID uint64,
+	) ([]models.SMS, error)
+}
+
 func NewSMSRepository(db *gorm.DB) *SMSRepository {
 	return &SMSRepository{
 		db: db,
