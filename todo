@@ -1,8 +1,1 @@
-- decrease balance by sending sms
-- rate limiter
-- make the design decision even better -> how many users handled, why numbers are used and etc..
-- draw diagram
-
-- test swagger
-- test all the flow
-- make docs
+write some tests
