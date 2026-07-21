@@ -1,30 +1,44 @@
 # SMS Gateway Service
 
+# Table of Contents
+
+- [Overview](#overview)
+- [Features](#features)
+- [Architecture](#architecture)
+- [Traffic Classification Algorithm](#traffic-classification-algorithm)
+- [Idempotency](#idempotency)
+- [Design Decisions](#design-decisions)
+- [RabbitMQ Topology](#rabbitmq-topology)
+- [Project Structure](#project-structure)
+- [Running the Project](#running-the-project)
+- [API Endpoints](#api-endpoints)
+- [Future Improvements](#future-improvements)
+
+---
 ## Overview
 
 SMS Gateway Service is a distributed backend service responsible for receiving SMS requests, routing them for delivery, tracking their delivery status, and dynamically classifying users based on traffic patterns.
 
 The service is designed to support high-throughput workloads by separating responsibilities into independent applications communicating through RabbitMQ while using PostgreSQL for persistence and Redis for caching and traffic analysis.
 
-A distributed SMS gateway built with Go, RabbitMQ, Redis, and PostgreSQL that supports asynchronous message processing, traffic classification, and delivery tracking.
 
 ---
 
 ## Features
 
-- Send single SMS
-- Send batch SMS
-- User balance management
-- Delivery status tracking
-- Dynamic traffic classification
-- RabbitMQ-based asynchronous processing
-- Redis-backed caching
-- PostgreSQL persistence
-- Daily partitioned SMS table
-- Swagger / OpenAPI documentation
+- Asynchronous SMS processing using RabbitMQ
+- Single and concurrent batch SMS submission
+- Dynamic user traffic classification (Standard / Bulk)
+- Intelligent queue routing based on traffic class and message priority
+- Delivery status tracking through acknowledgement events
+- User balance management with atomic updates
+- Idempotent SMS submission using client identifiers
+- Redis-backed caching and distributed request counters
+- Daily partitioned PostgreSQL tables for high-volume SMS storage
+- Background workers for traffic classification and delivery processing
+- Manual dependency injection with a centralized application container
+- OpenAPI (Swagger) documentation
 - Structured logging with Zap
-- Concurrent batch processing with bounded worker pool
-- Idempotent SMS submission using Client ID
 
 ---
 
@@ -40,87 +54,10 @@ The system is composed of three independent applications.
 
 Each application shares the same dependency wiring while containing only the logic required for its responsibility.
 
----
+The following diagram illustrates the high-level architecture of the system, showing how the three applications interact with PostgreSQL, Redis, RabbitMQ, and the external SMS provider. It also highlights the overall message flow from the API through delivery acknowledgement.
 
-# High Level Flow
+![SMS Gateway Service Architecture](docs/images/sms_gateway_service.drawio.png)
 
-```text
-                    Client
-                       │
-                 HTTP REST API
-                       │
-               Validate Request
-                       │
-              Decrease User Balance
-                       │
-              Store SMS (Pending)
-                       │
-         Increment Redis Hour Counter
-                       │
-          Resolve User Traffic Class
-                       │
-              Publish to RabbitMQ
-                       │
-         ┌─────────────┴─────────────┐
-         │                           │
- standard / express          bulk / express
-         │                           │
-         └─────────────┬─────────────┘
-                       │
-                  SMS Provider
-                       │
-                  Delivery ACK
-                       │
-                  sms.ack Queue
-                       │
-                 Message Consumer
-                       │
-             Update SMS Delivery Status
-```
-
----
-
----
-
-# Dependency Injection & Application Bootstrap
-
-The project uses **manual dependency injection** with a shared application bootstrap.
-
-The `App` container is responsible for creating and wiring shared dependencies such as repositories, services, Redis, PostgreSQL, and RabbitMQ components. This provides a single composition root for the entire system.
-
-Different executables are created through an **Application Factory**, where each application implements a common interface:
-
-```go
-type Application interface {
-    Build() error
-    Run() error
-}
-```
-
-Registered applications:
-
-- API
-- Traffic Classifier
-- Message Consumer
-
-Each application only builds the components specific to its responsibility, while sharing the common infrastructure and business services.
-
-```
-App
- │
- ├── Shared Dependencies
- │     ├── Repositories
- │     ├── Services
- │     ├── Redis
- │     └── RabbitMQ
- │
- └── Application Factory
-       ├── API
-       ├── Traffic Classifier
-       └── Message Consumer
-```
-
-This design keeps dependency wiring centralized, reduces duplication, and makes adding new applications straightforward.
 
 ---
 
@@ -142,68 +79,78 @@ The user's traffic class is then used to determine the RabbitMQ routing key:
 
 This approach enables high-volume users to be routed through dedicated queues while keeping routing decisions fast through Redis caching.
 
-
----
-
-# Delivery Tracking
-
-Every SMS is persisted with an initial `Pending` status before being published to RabbitMQ.
-
-Once the SMS provider publishes a delivery acknowledgement, the Message Consumer updates the status in PostgreSQL.
-
-Example:   
-
-```json
-{
-  "sms_id": 123,
-  "status": "delivered"
-}
-```
-
-The Message Consumer processes this event and updates the SMS status in PostgreSQL.
-
----
-
-## Idempotency
-
-Each SMS request may include a `client_id`.
-
-The combination of `(user_id, client_id)` uniquely identifies a request, preventing duplicate SMS creation when clients retry requests.
-
 ---
 
 # Design Decisions
 
-### RabbitMQ
+### Availability over Consistency
 
-RabbitMQ decouples the HTTP API from SMS delivery. The API publishes SMS requests asynchronously, allowing message processing to continue independently while improving responsiveness and scalability.
+For SMS submission, the system prioritizes **availability** over **strong consistency**. The API aims to accept and enqueue requests quickly rather than coupling request processing to multiple distributed operations.
 
-### Redis
+To keep the request path lightweight:
 
-Redis is used to cache user traffic classifications and maintain hourly request counters. This enables fast routing decisions and efficient traffic analysis without querying PostgreSQL on every request.
+- SMS publishing is asynchronous through RabbitMQ.
+- The system does not implement the Transactional Outbox pattern.
+- Database writes and message publishing are not wrapped in a distributed transaction.
+- Client-provided IDs are accepted without enforcing global uniqueness, avoiding additional coordination on the write path.
 
-### PostgreSQL
+In contrast, operations that directly affect business correctness, such as **user balance validation and deduction**, prioritize consistency. These operations rely on atomic database updates to prevent overspending and race conditions under concurrent requests.
 
-PostgreSQL is the system of record for users and SMS messages. It ensures reliable persistence for user balances, SMS records, and delivery status updates.
-
-### Daily Partitioning
-
-The `sms` table is partitioned daily by `created_at` to improve write performance, optimize time-based queries, and simplify data retention as the dataset grows.
-
-### Background Workers
-
-Traffic classification and delivery acknowledgement processing run as separate applications. Keeping these tasks outside the HTTP API allows each workload to scale and evolve independently.
+This separation allows the system to maximize throughput for high-volume SMS processing while maintaining correctness where it directly impacts user state.
 
 ### Manual Dependency Injection
 
-The project uses a centralized application container to create and inject shared dependencies. This keeps dependency wiring explicit, avoids global state, and simplifies maintenance.
+The project uses manual dependency injection with a centralized application container acting as the composition root. Shared infrastructure and business services are created once and injected into each application, keeping dependency wiring explicit, avoiding global state, and simplifying testing and maintenance.
+
+### Traffic Classifier
+
+The **Traffic Classifier** runs as a separate background application responsible for identifying high-volume users. Running this process independently keeps the HTTP API lightweight and avoids expensive traffic analysis during request processing.
+
+User traffic is evaluated over a **4-hour sliding window** using hourly request counters stored in Redis.
+
+The threshold was selected based on the expected workload. With approximately **1 million SMS per day** distributed across **50,000 users**, the average user sends roughly **20 SMS per day** (less than **1 SMS per hour**). A threshold of **500 SMS/hour** therefore represents a significant traffic spike rather than normal activity, allowing genuinely high-volume senders to be routed to dedicated queues without affecting regular users.
+
+A **4-hour window** was chosen to balance responsiveness and stability. It allows the system to react quickly to sustained increases in traffic while avoiding frequent traffic class changes caused by short-lived spikes.
+
+These values are intended as sensible defaults rather than fixed rules. As more production traffic becomes available, they can be adjusted using observed user behavior, traffic distributions, and system performance metrics.
+
+### Message Consumer
+
+The **Message Consumer** runs as an independent background application responsible for processing delivery acknowledgements from RabbitMQ and updating SMS statuses in PostgreSQL.
+
+Separating acknowledgement processing from the HTTP API prevents delivery updates from impacting request latency and allows consumers to scale independently based on message throughput.
+
+
 
 ### Bulk Operations
 
 High-volume updates, such as traffic classification changes, are performed using bulk database updates and Redis pipelining to reduce network overhead and improve performance.
+
+### RabbitMQ
+
+RabbitMQ was chosen to decouple the HTTP API from SMS delivery, allowing requests to be processed asynchronously without blocking clients. It provides flexible routing through exchanges and routing keys, making it straightforward to separate traffic into Standard/Bulk and Ordinary/Express queues without changing application code.
+
+RabbitMQ also offers reliable message delivery, acknowledgements, retries, dead-letter queues, and horizontal scaling through multiple consumers, making it well suited for high-throughput messaging workloads.
+
+### Redis
+
+Redis is used as the primary caching layer due to its extremely low latency and in-memory architecture. It stores user traffic classifications and hourly request counters, eliminating unnecessary database queries from the critical request path.
+
+Redis also enables distributed state management, allowing multiple API instances to share the same counters and cached values consistently. Atomic operations such as `INCRBY` make it ideal for tracking request volumes without introducing race conditions, while key expiration naturally removes outdated traffic data.
+
+### PostgreSQL
+
+PostgreSQL was selected as the primary datastore because of its strong ACID guarantees, transactional consistency, and mature relational capabilities. Since SMS records and user balances are business-critical data, correctness and reliability take priority over eventual consistency.
+
+The SMS table is range-partitioned by day to support high write throughput while keeping indexes small and improving query performance for time-based data. PostgreSQL's native partitioning, indexing, and query planner make it well suited for large append-only datasets such as SMS history.
+
+PostgreSQL was preferred over MySQL due to its mature partitioning support, richer SQL capabilities, and suitability for large transactional workloads.
+
 ---
 
 # RabbitMQ Topology
+
+Messages are routed through RabbitMQ using routing keys based on the user's traffic class and SMS priority, allowing Standard/Bulk and Ordinary/Express traffic to be processed independently.
 
 ## Exchanges
 
@@ -263,6 +210,7 @@ internals/
 │   └── errors/               # Domain and HTTP error definitions
 ├── logger/                   # Zap logger configuration
 ├── message_broker/           # RabbitMQ publishers, consumers and topology
+├── middlewares/             # Shared middleware (rate limiting, etc.)
 ├── models/                   # Database models (GORM)
 ├── repositories/             # Data access layer
 ├── services/                 # Business logic
@@ -275,24 +223,9 @@ migrations/                   # SQL database migrations
 ```
 
 ---
-
-# Technology Stack
-
-| Component | Technology |
-|-----------|------------|
-| Language | Go 1.26 |
-| HTTP | Gin |
-| ORM | GORM |
-| Database | PostgreSQL 17 |
-| Cache | Redis 7 |
-| Messaging | RabbitMQ 4 |
-| Logging | Zap |
-| API Documentation | Swagger / OpenAPI |
-| Configuration | godotenv |
-
----
-
 # Running the Project
+
+Run each application in a separate terminal after starting the infrastructure.
 
 ## Start Infrastructure
 
@@ -344,28 +277,12 @@ http://localhost:8080/swagger/index.html
 
 ---
 
-# Design Principles
-
-- Clean Architecture
-- Repository Pattern
-- Dependency Injection
-- Event-driven communication
-- Asynchronous processing
-- Background workers
-- Separation of concerns
-- Redis-as-cache
-- PostgreSQL partitioning
-- Versioned SQL migrations
-
----
-
-# Future Improvements
+## Future Improvements
 
 - Transactional Outbox Pattern for guaranteed RabbitMQ delivery
+- Retry and dead-letter queues
 - Automatic partition creation and cleanup
 - Prometheus metrics
-- Distributed tracing (OpenTelemetry)
+- Distributed tracing (Jaeger)
 - Authentication and authorization
-- Rate limiting
-- Retry and dead-letter queues
 - Integration and end-to-end tests
