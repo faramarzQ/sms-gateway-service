@@ -9,10 +9,12 @@ import (
 	"github.com/faramarzQ/sms-gateway-service/internals/dtos"
 	httpErrors "github.com/faramarzQ/sms-gateway-service/internals/http/errors"
 	"github.com/faramarzQ/sms-gateway-service/internals/http/requests"
+	"github.com/faramarzQ/sms-gateway-service/internals/logger"
 	"github.com/faramarzQ/sms-gateway-service/internals/models"
 	"github.com/faramarzQ/sms-gateway-service/internals/repositories"
 	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
 	"github.com/redis/go-redis/v9"
+	"go.uber.org/zap"
 	"gorm.io/gorm"
 	"time"
 )
@@ -107,6 +109,9 @@ func (s *UserService) GetUserTrafficClass(ctx context.Context, userId uint64) (*
 		data,
 		24*time.Hour,
 	).Err()
+	if err != nil {
+		logger.Logger.Error("redis set failed", zap.Error(err))
+	}
 
 	return trafficClass, nil
 }

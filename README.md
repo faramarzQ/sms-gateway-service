@@ -39,6 +39,7 @@ The service is designed to support high-throughput workloads by separating respo
 - Manual dependency injection with a centralized application container
 - OpenAPI (Swagger) documentation
 - Structured logging with Zap
+- Dockerized applications with Kubernetes deployment support
 
 ---
 

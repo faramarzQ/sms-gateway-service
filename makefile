@@ -1,8 +1,6 @@
 .PHONY: \
 	help api classifier consumer swagger \
-	docker-up docker-down docker-logs \
-	docker-build-api docker-build-classifier docker-build-consumer docker-build-all \
-	fmt tidy test clean
+	fmt tidy lint lint-fix test check clean
 
 API_IMAGE=sms-gateway-api
 CLASSIFIER_IMAGE=sms-gateway-traffic-classifier
@@ -24,14 +22,17 @@ help:
 	@echo "  make docker-down              Stop infrastructure"
 	@echo "  make docker-logs              Show infrastructure logs"
 	@echo "  make docker-build-api         Build API Docker image"
-	@echo "  make docker-build-classifier  Build Traffic Classifier image"
-	@echo "  make docker-build-consumer    Build Message Consumer image"
+	@echo "  make docker-build-classifier  Build Traffic Classifier Docker image"
+	@echo "  make docker-build-consumer    Build Message Consumer Docker image"
 	@echo "  make docker-build-all         Build all Docker images"
 	@echo ""
 	@echo "Development:"
 	@echo "  make fmt                      Format Go code"
 	@echo "  make tidy                     Run go mod tidy"
+	@echo "  make lint                     Run golangci-lint"
+	@echo "  make lint-fix                 Run golangci-lint with automatic fixes"
 	@echo "  make test                     Run tests"
+	@echo "  make check                    Run fmt, lint and tests"
 	@echo "  make clean                    Clean Go build cache"
 
 api:
@@ -65,8 +66,16 @@ fmt:
 tidy:
 	go mod tidy
 
+lint:
+	golangci-lint run
+
+lint-fix:
+	golangci-lint run --fix
+
 test:
 	go test ./...
+
+check: fmt lint test
 
 clean:
 	go clean
