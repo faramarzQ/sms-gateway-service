@@ -6,7 +6,6 @@
 - [Features](#features)
 - [Architecture](#architecture)
 - [Traffic Classification Algorithm](#traffic-classification-algorithm)
-- [Idempotency](#idempotency)
 - [Design Decisions](#design-decisions)
 - [RabbitMQ Topology](#rabbitmq-topology)
 - [Project Structure](#project-structure)
