@@ -1,6 +1,11 @@
 package services
 
 import (
+	"context"
+	"github.com/faramarzQ/sms-gateway-service/internals/models"
+	"github.com/faramarzQ/sms-gateway-service/internals/repositories/mocks"
+	"github.com/stretchr/testify/assert"
+	"github.com/stretchr/testify/mock"
 	"testing"
 
 	"github.com/faramarzQ/sms-gateway-service/internals/value_objects"
@@ -62,4 +67,48 @@ func TestCalculateRoutingKey(t *testing.T) {
 			}
 		})
 	}
+}
+
+func TestGetReport(t *testing.T) {
+	repo := new(mocks.SMSRepositoryMock)
+
+	var userID uint64 = 1
+
+	expectedSMS := []models.SMS{
+		{
+			ID:          1,
+			PhoneNumber: "09123456789",
+			Message:     "hello",
+		},
+		{
+			ID:          2,
+			PhoneNumber: "09123456789",
+			Message:     "hello 2",
+		},
+	}
+
+	repo.
+		On("GetUserSMS", mock.Anything, userID).
+		Return(expectedSMS, nil)
+
+	service := &SMSService{
+		repo: repo,
+	}
+
+	report, err := service.GetReport(context.Background(), userID)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, report)
+
+	assert.Equal(t, userID, report.UserID)
+	assert.Equal(t, int64(2), report.Total)
+	assert.Len(t, report.SMS, 2)
+
+	assert.Equal(t, uint64(1), report.SMS[0].ID)
+	assert.Equal(t, "hello", report.SMS[0].Message)
+
+	assert.Equal(t, uint64(2), report.SMS[1].ID)
+	assert.Equal(t, "hello 2", report.SMS[1].Message)
+
+	repo.AssertExpectations(t)
 }
