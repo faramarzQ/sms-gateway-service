@@ -222,8 +222,8 @@ deployments/
 
 migrations/                   # SQL database migrations
 ```
-
 ---
+
 # Running the Project
 
 Run each application in a separate terminal after starting the infrastructure.
@@ -231,7 +231,15 @@ Run each application in a separate terminal after starting the infrastructure.
 ## Start Infrastructure
 
 ```bash
-docker compose -f deployments/docker-compose.yml up -d
+make docker-up
+```
+
+---
+
+## Generate Swagger Documentation
+
+```bash
+make swagger
 ```
 
 ---
@@ -239,15 +247,17 @@ docker compose -f deployments/docker-compose.yml up -d
 ## Run API
 
 ```bash
-go run ./cmd/api
+make api
 ```
+
+> **Note:** Database migrations are executed automatically when the API starts. No manual migration step is required.
 
 ---
 
 ## Run Traffic Classifier
 
 ```bash
-go run ./cmd/traffic_classifier
+make classifier
 ```
 
 ---
@@ -255,7 +265,7 @@ go run ./cmd/traffic_classifier
 ## Run Message Consumer
 
 ```bash
-go run ./cmd/message_consumer
+make consumer
 ```
 
 ---
