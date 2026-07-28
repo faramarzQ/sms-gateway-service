@@ -55,7 +55,7 @@ func (s *UserService) IncreaseBalance(ctx context.Context, userId uint64, req re
 		return httpErrors.ErrUserNotFound
 	}
 
-	if req.Amount < 0 {
+	if req.Amount <= 0 {
 		return errors.New("amount must be greater than zero")
 	}
 

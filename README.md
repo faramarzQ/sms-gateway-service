@@ -33,6 +33,7 @@ The service is designed to support high-throughput workloads by separating respo
 - User balance management with atomic updates
 - Idempotent SMS submission using client identifiers
 - Redis-backed caching and distributed request counters
+- Redis-based API rate limiting
 - Daily partitioned PostgreSQL tables for high-volume SMS storage
 - Background workers for traffic classification and delivery processing
 - Manual dependency injection with a centralized application container
